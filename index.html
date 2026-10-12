@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏓</text></svg>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-    <title>Pickleball 40 | Tournoi Interclubs v3</title>
+    <title>PickleBall Interclubs Flexible | Format E</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -38,7 +38,7 @@
         let terrainsParSalle = [6]; // nombre de terrains par salle
         let salleNames = ['Salle A']; // noms des salles
         let randomMode = true;
-        let currentFormat = "A";
+        let currentFormat = "E";
         let timeSettings = { startP1:'09:00', durationP1:30, breakP1:5, lunchStart:'12:30', lunchDuration:90, durationP2:30, breakP2:5 };
         let isAdmin = false;
         let isSaisie = false;
@@ -51,6 +51,8 @@
 
         const GROUP_NAMES_10 = ['A','B','C','D','E','F','G','H','I','J'];
         const GROUP_NAMES_8 = ['A','B','C','D','E','F','G','H'];
+        function groupLabel(i){ return i<26 ? String.fromCharCode(65+i) : 'G'+(i+1); }
+        function selectedTeamCount(){ const el=document.getElementById('teamCount'); const n=parseInt(el?.value)||40; return [32,36,40,44,48].includes(n)?n:40; }
 
         // Noms des poules format E
         const FORMAT_E_POOL_NAMES = [
@@ -195,7 +197,7 @@
         // ============ ÉQUIPES ============
         function initTeams(){
             teams=[];
-            for(let i=1;i<=40;i++) teams.push({id:i,club:`Club ${i}`,player1:`Joueur ${2*i-1}`,player2:`Joueur ${2*i}`});
+            for(let i=1;i<=selectedTeamCount();i++) teams.push({id:i,club:`Club ${i}`,player1:`Joueur ${2*i-1}`,player2:`Joueur ${2*i}`});
             renderTeamsEditor();
             updateTopRecap();
         }
@@ -278,23 +280,23 @@
                 if(score<bestScore){ bestScore=score; best=result; }
                 if(bestScore===0) break; // Parfait, on s'arrête
             }
-            let groupNames=(nbGroups===10)?GROUP_NAMES_10:GROUP_NAMES_8;
+            let groupNames=Array.from({length:nbGroups},(_,i)=>groupLabel(i));
             if(bestScore>0) showMsg(`⚠️ Tirage : ${bestScore} conflit(s) de club inévitable(s) après 300 essais`);
             return best.map((g,i)=>({name:groupNames[i],teams:g}));
         }
 
         function drawOrdered(){
             let sorted=[...teams].sort((a,b)=>a.id-b.id);
-            let nbGroups=(currentFormat==="C"||currentFormat==="D")?8:10;
-            let teamsPerGroup=(currentFormat==="C"||currentFormat==="D")?5:4;
-            let groupNames=(nbGroups===10)?GROUP_NAMES_10:GROUP_NAMES_8;
+            let nbGroups=teams.length/4;
+            let teamsPerGroup=4;
+            let groupNames=Array.from({length:nbGroups},(_,i)=>groupLabel(i));
             return Array.from({length:nbGroups},(_,i)=>({name:groupNames[i],teams:sorted.slice(i*teamsPerGroup,(i+1)*teamsPerGroup)}));
         }
 
         function doTirage(){
             if(!isAdmin){ showMsg("🔒 Seul l'administrateur peut faire le tirage"); return; }
-            let nbGroups=(currentFormat==="C"||currentFormat==="D")?8:(currentFormat==="E"?10:10);
-            let teamsPerGroup=(currentFormat==="C"||currentFormat==="D")?5:(currentFormat==="E"?4:4);
+            let nbGroups=teams.length/4;
+            let teamsPerGroup=4;
             if(randomMode) groupsP1=drawGroupsAvoidSameClub(nbGroups,teamsPerGroup);
             else groupsP1=drawOrdered();
             matchesP1=[]; matchesP2=[]; matchesFinales=[]; groupsP2E=[];
@@ -383,7 +385,7 @@
                 let t1=stats.find(s=>s.team.id===m.team1.id), t2=stats.find(s=>s.team.id===m.team2.id);
                 if(!t1||!t2) return;
                 t1.bp+=s1; t1.bc+=s2; t2.bp+=s2; t2.bc+=s1;
-                if(s1>s2){ t1.w++;t2.l++;t1.pts+=3; } else if(s2>s1){ t2.w++;t1.l++;t2.pts+=3; } else { t1.d++;t2.d++;t1.pts+=2;t2.pts+=2; }
+                if(s1>s2){ t1.w++;t2.l++;t1.pts+=3; } else if(s2>s1){ t2.w++;t1.l++;t2.pts+=3; } else { t1.d++;t2.d++;t1.pts+=1;t2.pts+=1; }
                 t1.matchScores.push(s1); t1.matchScoresAgainst.push(s2);
                 t2.matchScores.push(s2); t2.matchScoresAgainst.push(s1);
             });
@@ -391,27 +393,18 @@
             // Tri stable multi-critères P1 :
             // 1.victoires  2.pts  3.diff  4.bp  5.confrontation directe  6.score 1er match  7.score 2 premiers matchs
             function cmpP1(a,b){
-                if(b.w!==a.w) return b.w-a.w;          // 1. Victoires (prioritaire)
-                if(b.pts!==a.pts) return b.pts-a.pts;  // 2. Points totaux
-                if(b.diff!==a.diff) return b.diff-a.diff; // 3. Différentiel
-                if(b.bp!==a.bp) return b.bp-a.bp;      // 4. Meilleure attaque
-                let direct=getDirectConfrontation(a.team,b.team,groupName); // 5. Confrontation directe
+                if(b.w!==a.w) return b.w-a.w;
+                if(b.pts!==a.pts) return b.pts-a.pts;
+                if(b.diff!==a.diff) return b.diff-a.diff;
+                if(b.bp!==a.bp) return b.bp-a.bp;
+                let direct=getDirectConfrontation(a.team,b.team,groupName);
                 if(direct!==0) return direct;
-                // 6. Goal-average du 1er match
-                let aGA1=(a.matchScores[0]??0)-(a.matchScoresAgainst[0]??0);
-                let bGA1=(b.matchScores[0]??0)-(b.matchScoresAgainst[0]??0);
-                if(bGA1!==aGA1) return bGA1-aGA1;
-                // 7. Goal-average du 2e match
-                let aGA2=(a.matchScores[1]??0)-(a.matchScoresAgainst[1]??0);
-                let bGA2=(b.matchScores[1]??0)-(b.matchScoresAgainst[1]??0);
-                if(bGA2!==aGA2) return bGA2-aGA2;
-                // 8. Meilleure attaque du 1er match
-                let aAtt1=a.matchScores[0]??-1, bAtt1=b.matchScores[0]??-1;
-                if(bAtt1!==aAtt1) return bAtt1-aAtt1;
-                // 9. Meilleure attaque du 2e match
-                let aAtt2=a.matchScores[1]??-1, bAtt2=b.matchScores[1]??-1;
-                if(bAtt2!==aAtt2) return bAtt2-aAtt2;
-                return (a.team.club||'').localeCompare(b.team.club||''); // 10. Alphabétique
+                let aFirst=a.matchScores[0]??-1, bFirst=b.matchScores[0]??-1;
+                if(bFirst!==aFirst) return bFirst-aFirst;
+                let aFirstTwo=(a.matchScores[0]??0)+(a.matchScores[1]??0);
+                let bFirstTwo=(b.matchScores[0]??0)+(b.matchScores[1]??0);
+                if(bFirstTwo!==aFirstTwo) return bFirstTwo-aFirstTwo;
+                return (a.team.club||'').localeCompare(b.team.club||'');
             }
             // Tri stable : insertion sort pour garantir la cohérence des égalités à 3+ équipes
             for(let i=1;i<stats.length;i++){
@@ -762,7 +755,9 @@
         const FORMAT_E_CATEGORIES = ['elite','elite','or','or','argent','argent','bronze','bronze','consol','consol'];
 
         function genPhase2FormatE(){
+            if(!isAdmin){ showMsg("🔒 Seul l'administrateur peut générer la Phase 2"); return; }
             if(!groupsP1.length||!matchesP1.length){ showMsg("Générez Phase 1 d'abord"); return; }
+            if(teams.length!==40){ genPhase2Flexible(); return; }
             // Classement général P1
             let all=getAllTeamsRankedP1();
             for(let i=1;i<all.length;i++){ let cur=all[i],j=i-1; while(j>=0&&cmpGeneralP1(all[j],cur)>0){all[j+1]=all[j];j--;} all[j+1]=cur; }
@@ -784,6 +779,24 @@
             genMatchesFromGroupsE();
             renderPhase2UI(); renderSchedule(); updateCounters(); saveData(); updateTopRecap();
             showMsg(`Phase 2 Format E : ${matchesP2.length} matchs générés`);
+        }
+
+        // Phase 2 adaptable pour 32, 36, 44 ou 48 équipes.
+        // Chaque poule contient 4 équipes issues de niveaux P1 différents.
+        function genPhase2Flexible(){
+            let all=getAllTeamsRankedP1();
+            for(let i=1;i<all.length;i++){ let cur=all[i],j=i-1; while(j>=0&&cmpGeneralP1(all[j],cur)>0){all[j+1]=all[j];j--;} all[j+1]=cur; }
+            const nGroups=teams.length/4;
+            const sorted=all.map(x=>x.team);
+            groupsP2E=[];
+            for(let i=0;i<nGroups;i++){
+                const idxs=[i,2*nGroups-1-i,2*nGroups+i,4*nGroups-1-i];
+                const poolTeams=idxs.map(idx=>sorted[idx]).filter(Boolean);
+                groupsP2E.push({name:`POULE ${groupLabel(i)}`,category:'general',teams:poolTeams,originalRanks:idxs});
+            }
+            genMatchesFromGroupsE();
+            renderPhase2UI(); renderSchedule(); updateCounters(); saveData(); updateTopRecap();
+            showMsg(`Phase 2 : ${nGroups} poules de 4 générées pour ${teams.length} équipes`);
         }
 
         function detectConflictsFormatE(){
@@ -846,7 +859,7 @@
                 let t1=stats.find(s=>s.team?.id===m.team1?.id), t2=stats.find(s=>s.team?.id===m.team2?.id);
                 if(!t1||!t2) return;
                 t1.bp+=s1;t1.bc+=s2;t2.bp+=s2;t2.bc+=s1;
-                if(s1>s2){t1.w++;t2.l++;t1.pts+=3;}else if(s2>s1){t2.w++;t1.l++;t2.pts+=3;}else{t1.d++;t2.d++;t1.pts+=2;t2.pts+=2;}
+                if(s1>s2){t1.w++;t2.l++;t1.pts+=3;}else if(s2>s1){t2.w++;t1.l++;t2.pts+=3;}else{t1.d++;t2.d++;t1.pts+=1;t2.pts+=1;}
                 t1.matchScores.push(s1);t1.matchScoresAgainst.push(s2);
                 t2.matchScores.push(s2);t2.matchScoresAgainst.push(s1);
             });
@@ -854,27 +867,18 @@
             // Tri stable multi-critères P2 :
             // 1.victoires  2.pts  3.diff  4.bp  5.confrontation directe  6.score 1er match  7.score 2 premiers matchs
             function cmpP2(a,b){
-                if(b.w!==a.w) return b.w-a.w;          // 1. Victoires (prioritaire)
-                if(b.pts!==a.pts) return b.pts-a.pts;  // 2. Points totaux
-                if(b.diff!==a.diff) return b.diff-a.diff; // 3. Différentiel
-                if(b.bp!==a.bp) return b.bp-a.bp;      // 4. Meilleure attaque
-                let dm=getDirectConfrontationP2(a.team,b.team,groupName); // 5. Confrontation directe
+                if(b.w!==a.w) return b.w-a.w;
+                if(b.pts!==a.pts) return b.pts-a.pts;
+                if(b.diff!==a.diff) return b.diff-a.diff;
+                if(b.bp!==a.bp) return b.bp-a.bp;
+                let dm=getDirectConfrontationP2(a.team,b.team,groupName);
                 if(dm!==0) return dm;
-                // 6. Goal-average du 1er match
-                let aGA1=(a.matchScores[0]??0)-(a.matchScoresAgainst[0]??0);
-                let bGA1=(b.matchScores[0]??0)-(b.matchScoresAgainst[0]??0);
-                if(bGA1!==aGA1) return bGA1-aGA1;
-                // 7. Goal-average du 2e match
-                let aGA2=(a.matchScores[1]??0)-(a.matchScoresAgainst[1]??0);
-                let bGA2=(b.matchScores[1]??0)-(b.matchScoresAgainst[1]??0);
-                if(bGA2!==aGA2) return bGA2-aGA2;
-                // 8. Meilleure attaque du 1er match
-                let aAtt1=a.matchScores[0]??-1, bAtt1=b.matchScores[0]??-1;
-                if(bAtt1!==aAtt1) return bAtt1-aAtt1;
-                // 9. Meilleure attaque du 2e match
-                let aAtt2=a.matchScores[1]??-1, bAtt2=b.matchScores[1]??-1;
-                if(bAtt2!==aAtt2) return bAtt2-aAtt2;
-                return (a.team.club||"").localeCompare(b.team.club||""); // 10. Alphabétique
+                let aFirst=a.matchScores[0]??-1, bFirst=b.matchScores[0]??-1;
+                if(bFirst!==aFirst) return bFirst-aFirst;
+                let aFirstTwo=(a.matchScores[0]??0)+(a.matchScores[1]??0);
+                let bFirstTwo=(b.matchScores[0]??0)+(b.matchScores[1]??0);
+                if(bFirstTwo!==aFirstTwo) return bFirstTwo-aFirstTwo;
+                return (a.team.club||'').localeCompare(b.team.club||'');
             }
             for(let i=1;i<stats.length;i++){
                 let cur=stats[i], j=i-1;
@@ -895,9 +899,9 @@
         function renderRankingP2(){
             const area=document.getElementById('rankingP2Area'); if(!area) return;
             if(!matchesP2.length){ area.innerHTML='<div class="panel"><div class="panel-body" style="color:var(--text-muted);">Générez la Phase 2 d\'abord.</div></div>'; return; }
-            const catOrder=['elite','or','argent','bronze','consol'];
-            const catLabels={elite:'🏅 ÉLITE',or:'🥇 OR',argent:'🥈 ARGENT',bronze:'🥉 BRONZE',consol:'🎗️ CONSOLATION'};
-            const catColors={elite:'var(--elite)',or:'var(--gold)',argent:'var(--silver)',bronze:'var(--bronze)',consol:'var(--consol)'};
+            const catOrder=['elite','or','argent','bronze','consol','general'];
+            const catLabels={elite:'🏅 ÉLITE',or:'🥇 OR',argent:'🥈 ARGENT',bronze:'🥉 BRONZE',consol:'🎗️ CONSOLATION',general:'🏓 GROUPES DE NIVEAU'};
+            const catColors={elite:'var(--elite)',or:'var(--gold)',argent:'var(--silver)',bronze:'var(--bronze)',consol:'var(--consol)',general:'var(--accent)'};
             let groupsMap=new Map();
             matchesP2.forEach(m=>{ if(!groupsMap.has(m.groupName)) groupsMap.set(m.groupName,{category:m.category,matches:[]}); groupsMap.get(m.groupName).matches.push(m); });
             let html='';
@@ -932,7 +936,7 @@
             </div></div>` : '';
 
             let editGroupsHtml='';
-            if(currentFormat==='E'&&groupsP2E.length>0&&isAdmin){
+            if(currentFormat==='E'&&teams.length===40&&groupsP2E.length>0&&isAdmin){
                 editGroupsHtml=renderFormatEGroupEditor();
             }
 
@@ -940,9 +944,9 @@
             matchesP2.forEach(m=>{ if(!groupsMap.has(m.groupName)) groupsMap.set(m.groupName,[]); groupsMap.get(m.groupName).push(m); });
 
             // Regrouper par catégorie
-            const catOrder=['elite','or','argent','bronze','consol'];
-            const catLabels={elite:'🏅 ÉLITE',or:'🥇 OR',argent:'🥈 ARGENT',bronze:'🥉 BRONZE',consol:'🎗️ CONSOLATION'};
-            const catColors={elite:'var(--elite)',or:'var(--gold)',argent:'var(--silver)',bronze:'var(--bronze)',consol:'var(--consol)'};
+            const catOrder=['elite','or','argent','bronze','consol','general'];
+            const catLabels={elite:'🏅 ÉLITE',or:'🥇 OR',argent:'🥈 ARGENT',bronze:'🥉 BRONZE',consol:'🎗️ CONSOLATION',general:'🏓 GROUPES DE NIVEAU'};
+            const catColors={elite:'var(--elite)',or:'var(--gold)',argent:'var(--silver)',bronze:'var(--bronze)',consol:'var(--consol)',general:'var(--accent)'};
 
             let fullHtml='';
             catOrder.forEach(cat=>{
@@ -1056,6 +1060,22 @@
             if(currentFormat!=='E'){ showMsg("⚠️ Les matchs de classement final sont uniquement disponibles en Format E"); return; }
             if(!matchesP2.length){ showMsg("Générez Phase 2 d'abord"); return; }
 
+            if(teams.length!==40){
+                const all=[];
+                groupsP2E.forEach(g=>{
+                    computePhase2Rank(g.name).forEach((st,pos)=>all.push({...st,groupPos:pos+1,groupName:g.name}));
+                });
+                all.sort((a,b)=>a.groupPos-b.groupPos || b.w-a.w || b.pts-a.pts || b.diff-a.diff || b.bp-a.bp || (a.team?.club||'').localeCompare(b.team?.club||''));
+                matchesFinales=[];
+                let terrain=1,total=Math.max(1,getTotalTerrains());
+                for(let i=0;i+1<all.length;i+=2){
+                    matchesFinales.push({id:matchesFinales.length+1,category:'general',groupPair:'Classement général',rank1:i+1,rank2:i+2,team1:all[i].team,team2:all[i+1].team,score1:'',score2:'',terrain:((terrain-1)%total)+1});
+                    terrain++;
+                }
+                renderFinalesUI(); renderSchedule(); saveData();
+                showMsg(`${matchesFinales.length} matchs de classement générés`);
+                return;
+            }
             // Récupérer les groupes avec leur classement
             let groupsMap=new Map();
             matchesP2.forEach(m=>{ if(!groupsMap.has(m.groupName)) groupsMap.set(m.groupName,{category:m.category,matches:[]}); groupsMap.get(m.groupName).matches.push(m); });
@@ -1214,7 +1234,7 @@
             function add(id,forScore,against,win,draw,phase){
                 let s=map.get(id); if(!s) return;
                 if(win){s.pts+=3;s.wins++;if(phase===1)s.ptsP1+=3;else s.ptsP2+=3;}
-                else if(draw){s.pts+=2;s.draws++;if(phase===1)s.ptsP1+=2;else s.ptsP2+=2;}
+                else if(draw){s.pts+=1;s.draws++;if(phase===1)s.ptsP1+=1;else s.ptsP2+=1;}
                 else s.losses++;
                 s.bp+=forScore; s.bc+=against; s.diff+=(forScore-against);
                 if(phase===1) s.matchScoresP1.push(forScore);
@@ -1295,9 +1315,9 @@
             const area=document.getElementById('rankingArea'); if(!area) return;
             let finalRanking=computeFinalRanking();
             let ptRanking=computeTotalPoints();
-            const catOrder=['elite','or','argent','bronze','consol'];
-            const catLabels={elite:'🏅 ÉLITE',or:'🥇 OR',argent:'🥈 ARGENT',bronze:'🥉 BRONZE',consol:'🎗️ CONSOLATION'};
-            const catColors={elite:'var(--elite)',or:'var(--gold)',argent:'var(--silver)',bronze:'var(--bronze)',consol:'var(--consol)'};
+            const catOrder=['elite','or','argent','bronze','consol','general'];
+            const catLabels={elite:'🏅 ÉLITE',or:'🥇 OR',argent:'🥈 ARGENT',bronze:'🥉 BRONZE',consol:'🎗️ CONSOLATION',general:'🏓 GROUPES DE NIVEAU'};
+            const catColors={elite:'var(--elite)',or:'var(--gold)',argent:'var(--silver)',bronze:'var(--bronze)',consol:'var(--consol)',general:'var(--accent)'};
 
             let html='';
 
@@ -1962,7 +1982,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
                 B:{p1:'10 groupes de 4, 3 matchs',p2:'8 groupes de 5 (Élite × 4 + Consol × 4), 4 matchs'},
                 C:{p1:'8 groupes de 5, 4 matchs',p2:'10 groupes de 4, 3 matchs'},
                 D:{p1:'8 groupes de 5, 4 matchs',p2:'8 groupes de 5, 4 matchs'},
-                E:{p1:'10 groupes de 4, 3 matchs',p2:'10 poules de 4 (Élite/Or/Argent/Bronze/Consolante × 2), 3 matchs + matchs de classement'}
+                E:{p1:`${teams.length/4} groupes de 4, 3 matchs par équipe`,p2:teams.length===40?'10 poules de 4 (Élite/Or/Argent/Bronze/Consolante × 2), 3 matchs + matchs de classement':`${teams.length/4} poules de 4 réparties selon le classement P1, puis matchs de classement`}
             };
             let d=fmtData[fmt]||fmtData['A'];
             let total=getTotalTerrains();
@@ -2050,7 +2070,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
                 '1er pool A vs 1er pool B → places 1 &amp; 2 · … · 4e pool A vs 4e pool B → places 39 &amp; 40<br><br>'+
                 "<b>En cas de match nul</b>, départage dans l'ordre strict :<br>"+
                 ruleList([
-                    "Cumul de points P1 + P2",
+                    "Cumul de points P1 + P2 (victoire 3, nul 1, défaite 0)",
                     "Goal-average général (différentiel de points sur tout le tournoi)",
                     "Meilleure attaque (total de points marqués P1 + P2)",
                     "Nombre de victoires (P1 + P2)"
@@ -2073,7 +2093,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
         async function saveDataToFirebase(data){
             if(!db||(!isAdmin&&!isSaisie)) return;
             try {
-                await setDoc(doc(db,'tournoi','data'),{
+                await setDoc(doc(db,'tournoi','data_flexible'),{
                     teams:data.teams, groupsP1:data.groupsP1, matchesP1:data.matchesP1, matchesP2:data.matchesP2,
                     matchesFinales:data.matchesFinales, groupsP2E:data.groupsP2E,
                     nbTerrains:data.nbTerrains, nbSalles:data.nbSalles,
@@ -2092,12 +2112,12 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
         }
 
         function applyFirebaseData(d){
-            teams=d.teams||[]; groupsP1=d.groupsP1||[]; matchesP1=d.matchesP1||[]; matchesP2=d.matchesP2||[];
+            teams=d.teams||[]; const teamCountEl=document.getElementById('teamCount'); if(teamCountEl && [32,36,40,44,48].includes(teams.length)) teamCountEl.value=String(teams.length); groupsP1=d.groupsP1||[]; matchesP1=d.matchesP1||[]; matchesP2=d.matchesP2||[];
             matchesFinales=d.matchesFinales||[]; groupsP2E=d.groupsP2E||[];
             nbTerrains=d.nbTerrains||6; nbSalles=d.nbSalles||1;
             terrainsParSalle=d.terrainsParSalle||[nbTerrains]; salleNames=d.salleNames||['Salle A'];
             randomMode=d.randomMode!==undefined?d.randomMode:true;
-            currentFormat=d.currentFormat||"A";
+            currentFormat="E";
             if(d.timeSettings) Object.assign(timeSettings,d.timeSettings);
             const formatRadio=document.querySelector(`input[name="format"][value="${currentFormat}"]`);
             if(formatRadio) formatRadio.checked=true;
@@ -2117,7 +2137,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             if(!db) return;
             if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot=null; }
             try {
-                const docRef=doc(db,'tournoi','data');
+                const docRef=doc(db,'tournoi','data_flexible');
                 unsubscribeSnapshot=onSnapshot(docRef,(docSnap)=>{
                     if(docSnap.exists()) applyFirebaseData(docSnap.data());
                     else { initTeams(); }
@@ -2256,7 +2276,18 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             });
 
             document.querySelectorAll('input[name="format"]').forEach(r=>{
-                r.addEventListener('change',function(){ if(isAdmin){ currentFormat=this.value; saveData(); if(groupsP1.length) doTirage(); } });
+                r.addEventListener('change',function(){ if(isAdmin){ currentFormat='E'; saveData(); if(groupsP1.length) doTirage(); } });
+            });
+
+            const teamCountSelect=document.getElementById('teamCount');
+            if(teamCountSelect) teamCountSelect.addEventListener('change',function(){
+                if(!isAdmin){ this.value=String(teams.length||40); showMsg("🔒 Accès administrateur requis"); return; }
+                const n=parseInt(this.value);
+                if(![32,36,40,44,48].includes(n)){ this.value=String(teams.length||40); return; }
+                if(!confirm(`Changer pour ${n} équipes ? Les groupes, matchs et scores actuels seront réinitialisés.`)){ this.value=String(teams.length||40); return; }
+                initTeams(); groupsP1=[]; matchesP1=[]; matchesP2=[]; matchesFinales=[]; groupsP2E=[]; currentFormat='E';
+                renderGroupsPreview(); renderPhase1UI(); renderPhase2UI(); renderFinalesUI(); renderRankingP1(); renderRankingP2(); updateGlobalRanking(); updateCounters(); renderSchedule(); renderPlanning(); saveData(); updateTopRecap();
+                showMsg(`Configuration prête pour ${n} équipes`);
             });
 
             const nbSallesSelect=document.getElementById('nbSalles');
@@ -2448,6 +2479,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             .schedule-matches{ display:flex !important; }
         }
     </style>
+<!-- Application flexible : 32/36/40/44/48 équipes ; données isolées dans tournoi/data_flexible -->
 </head>
 <body>
 
@@ -2508,14 +2540,15 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             <div class="panel-header">⚙️ Format & Salles</div>
             <div class="panel-body">
                 <div class="config-group">
+                    <span class="config-label">Nombre d'équipes :</span>
+                    <label><select id="teamCount" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Poppins',sans-serif;font-size:0.82rem;width:auto;">
+                        <option value="32">32 équipes — 8 poules</option><option value="36">36 équipes — 9 poules</option><option value="40" selected>40 équipes — 10 poules (Format E original)</option><option value="44">44 équipes — 11 poules</option><option value="48">48 équipes — 12 poules</option>
+                    </select></label>
+                    <span style="font-size:.75rem;color:var(--text-muted);">Seuls les multiples de 4 de 32 à 48 sont autorisés.</span>
+                </div>
+                <div class="config-group">
                     <span class="config-label">Format :</span>
-                    <div class="format-options">
-                        <label class="format-option"><input type="radio" name="format" value="A" checked> A : P1=10×4 | P2=10×4 (Élite/Consol)</label>
-                        <label class="format-option"><input type="radio" name="format" value="B"> B : P1=10×4 | P2=8×5 (Élite/Consol)</label>
-                        <label class="format-option"><input type="radio" name="format" value="C"> C : P1=8×5 | P2=10×4 (Élite/Consol)</label>
-                        <label class="format-option"><input type="radio" name="format" value="D"> D : P1=8×5 | P2=8×5 (Élite/Consol)</label>
-                        <label class="format-option"><input type="radio" name="format" value="E"> E : P1=10×4 | P2=10 poules (Élite/Or/Argent/Bronze/Consolante) + Matchs classement</label>
-                    </div>
+                    <div class="format-options"><label class="format-option"><input type="radio" name="format" value="E" checked> Format E : P1 en poules de 4, P2 par niveaux et classement final</label></div>
                 </div>
                 <div class="config-group">
                     <span class="config-label">Salles :</span>
@@ -2616,7 +2649,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
 
 <div id="loginOverlay" class="login-overlay" style="display:none;">
     <div class="login-card">
-        <h2>🥒 Pickleball 40</h2>
+        <h2>🥒 PickleBall Interclubs Flexible</h2>
         <p>Tournoi Interclubs</p>
         <button id="loginBtn" class="login-btn">🔑 Se connecter avec Google</button>
     </div>
