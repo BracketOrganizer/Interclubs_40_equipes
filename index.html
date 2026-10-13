@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏓</text></svg>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-    <title>PickleBall Interclubs Flexible — style RSTH</title>
+    <title>PickleBall Interclubs Flexible | Format E</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -2481,60 +2481,16 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
     </style>
 <!-- Application flexible : 32/36/40/44/48 équipes ; données isolées dans tournoi/data_flexible -->
 
-<style id="rsth-reference-style">
-:root{
-  --bg:#dde3ee;--surface:#f0f4fa;--surface2:#fff;--border:rgba(30,80,180,.16);
-  --accent:#1a7a3a;--accent2:#145c2c;--accent-soft:rgba(26,122,58,.09);
-  --text:#1a2540;--text-muted:#6a7a9a;--danger:#c73535;--warning:#f1c75b;
-  --radius:12px;--radius-sm:8px;
-}
-body{background:var(--bg)!important;color:var(--text)!important;padding:14px 12px 90px!important;font-family:Arial,sans-serif!important}
-body::before{display:none!important}
-.container{max-width:1240px!important}
-.top-bar{background:var(--surface2);border:1px solid var(--border);border-radius:15px;padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 8px rgba(26,37,64,.05)}
-.logo h1{color:#1a2540!important;font-size:clamp(1.15rem,2.5vw,1.65rem)!important;letter-spacing:.01em!important}
-.logo h1 span{color:#1a7a3a!important}
-.badge{background:#e2f2e6!important;color:#145c2c!important;border-color:rgba(26,122,58,.25)!important;border-radius:5px!important;font-size:.7rem!important}
-.stat-card{background:#e8edf8!important;border:1px solid var(--border)!important;border-radius:7px!important;color:#6a7a9a!important}
-.stat-card b{color:#1a7a3a!important}
-.panel{background:#fff!important;border:1px solid var(--border)!important;border-radius:12px!important;box-shadow:0 2px 8px rgba(26,37,64,.04)!important}
-.panel-header{background:#1a2540!important;color:#fff!important;border-bottom:0!important;font-size:.88rem!important;letter-spacing:.02em}
-.panel-body{background:#fff!important}
-.top-recap{background:#f0f4fa!important;border:1px solid var(--border)!important;border-radius:9px!important}
-.recap-chip{background:#e8edf8!important;border-radius:5px!important;color:#1a2540!important}
-.tabs{background:#fff!important;border:1px solid var(--border)!important;border-radius:10px!important;padding:6px!important;gap:5px!important;margin:12px 0 16px!important}
-.tab{border-radius:6px!important;border:1px solid transparent!important;color:#526381!important;font-weight:700!important;padding:9px 12px!important}
-.tab.active{background:#1a7a3a!important;color:#fff!important;border-color:#145c2c!important;box-shadow:none!important}
-.tab:hover:not(.active){background:#e8edf8!important;color:#1a2540!important}
-button,.btn{transition:background .15s ease,border-color .15s ease!important}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid rgba(36,111,190,.35)!important;outline-offset:2px}
-.rsth-step-nav{display:flex;align-items:center;justify-content:center;gap:0;background:#f0f4fa;border:1px solid var(--border);border-radius:12px;padding:13px 10px;margin:12px 0 12px;overflow-x:auto}
-.rsth-step{border:0;background:transparent;color:#6a7a9a;display:flex;align-items:center;gap:8px;padding:4px 8px;min-width:0;white-space:nowrap;cursor:pointer;font-weight:700;font-size:.82rem}
-.rsth-step-n{width:29px;height:29px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#dce4f4;color:#536487;border:1px solid rgba(30,80,180,.18);font-weight:800;flex:0 0 auto}
-.rsth-step.active{color:#1a2540}
-.rsth-step.active .rsth-step-n{background:#1a7a3a;color:white;border-color:#145c2c}
-.rsth-step.done{color:#1a7a3a}
-.rsth-step.done .rsth-step-n{background:#dff0e4;color:#145c2c;border-color:#8dc9a0}
-.rsth-step-line{height:2px;width:clamp(12px,4vw,48px);background:#cbd5e7;flex:0 0 auto}
-.rsth-step-line.done{background:#1a7a3a}
-.config-label{color:#526381!important}
-input,select,textarea{accent-color:#1a7a3a}
-.schedule-card{border-radius:9px!important}
-.floating-nav .float-btn{background:#1a2540!important;color:#fff!important;border-radius:7px!important}
-.notice{border-radius:8px!important}
-@media(max-width:650px){
-  body{padding:8px 7px 82px!important}
-  .top-bar{padding:12px!important}
-  .rsth-step-nav{justify-content:flex-start;padding:10px 6px}
-  .rsth-step{flex-direction:column;gap:4px;font-size:.68rem;padding:2px 5px}
-  .rsth-step-n{width:27px;height:27px}
-  .rsth-step-line{width:15px}
-  .tabs{flex-wrap:nowrap!important;overflow-x:auto!important;justify-content:flex-start!important}
-  .tab{flex:0 0 auto}
-}
-@media print{
-  .rsth-step-nav{display:none!important}
-}
+<style id="rsth-flexible-design">
+:root{--ink:#1a2540;--ink2:#0f1a30;--dim:#8a9ab8;--muted:#6a7a9a;--s0:#f0f4fa;--s1:#fff;--s2:#e8edf8;--s3:#dce4f4;--bdr:rgba(30,80,180,.14);--bdr2:rgba(30,80,180,.28);--grn:#1a7a3a;--grn2:#145c2c;--grn-bg:rgba(26,122,58,.10);--ylw:#b8720a;--ylw-bg:rgba(184,114,10,.10);--red:#b02018;--red-bg:rgba(176,32,24,.10);--blu:#1560c0;--blu-bg:rgba(21,96,192,.10);--shadow:0 2px 12px rgba(30,60,120,.10);--shadow2:0 4px 24px rgba(30,60,120,.15);--r:10px;--bg:#dde3ee;--surface:#f0f4fa;--surface2:#fff;--border:rgba(30,80,180,.16);--accent:#1a7a3a;--accent2:#145c2c;--accent-soft:rgba(26,122,58,.09);--text:#1a2540;--text-muted:#6a7a9a;--radius:10px;--radius-sm:8px}
+*{box-sizing:border-box} body{background:var(--bg)!important;color:var(--ink)!important;font-family:Arial,Helvetica,sans-serif!important;padding:12px 12px 88px!important}body::before{display:none!important}.container{max-width:1240px!important;margin:0 auto!important}.top-bar{background:var(--ink)!important;color:#fff!important;border:0!important;border-radius:12px!important;box-shadow:var(--shadow2)!important;padding:14px 18px!important;gap:14px!important}.logo h1{font-family:Arial,sans-serif!important;font-weight:800!important;letter-spacing:.3px!important;font-size:clamp(19px,3vw,27px)!important;color:#fff!important}.logo h1 span{color:#75d69a!important}.logo .badge{background:rgba(255,255,255,.13)!important;color:#dce8ff!important;border:1px solid rgba(255,255,255,.15)!important}.stats{gap:7px!important}.stat-card{background:rgba(255,255,255,.10)!important;color:#fff!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:8px!important}.stat-card b{color:#fff!important}.user-info{color:#fff!important}.user-info button{font-family:Arial,sans-serif!important}
+.top-recap{background:#fff!important;border:1px solid var(--bdr)!important;border-radius:10px!important;box-shadow:var(--shadow)!important;padding:9px 11px!important;gap:7px!important}.recap-chip{background:var(--s2)!important;color:var(--ink)!important;border:1px solid var(--bdr)!important;border-radius:6px!important;font-family:Arial,sans-serif!important}
+.steps{display:flex;align-items:center;justify-content:space-between;gap:4px;margin:14px 0 10px;padding:12px 10px;background:#fff;border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--shadow)}.step{display:flex;align-items:center;gap:8px;min-width:0;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:700;padding:3px 6px;cursor:pointer;white-space:nowrap}.step-n{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:50%;background:var(--s2);border:1.5px solid var(--bdr2);color:var(--ink);font-weight:800}.step.active{color:var(--grn)}.step.active .step-n{background:var(--grn);border-color:var(--grn);color:white;box-shadow:0 0 0 4px var(--grn-bg)}.step.done{color:var(--grn)}.step.done .step-n{background:var(--grn-bg);border-color:var(--grn);color:var(--grn)}.step-ln{height:2px;flex:1;min-width:8px;background:var(--bdr2);border-radius:2px}.step-ln.done{background:var(--grn)}
+.flex-subnav{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(255,255,255,.64);border:1px solid var(--bdr);padding:8px;border-radius:10px;margin-bottom:14px}.flex-subgroup{display:none;align-items:center;gap:6px;flex-wrap:wrap;width:100%}.flex-subgroup.active{display:flex}.flex-subgroup button{border:1px solid var(--bdr2);background:#fff;color:var(--ink);border-radius:7px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}.flex-subgroup button:hover{border-color:var(--grn);color:var(--grn);background:var(--grn-bg)}.flex-subgroup button.active{background:var(--grn);border-color:var(--grn);color:#fff}.flex-tools{border-top:1px solid var(--bdr);padding-top:8px;margin-top:2px}.tabs{display:none!important}
+.panel,.card,.config-group,.team-card,.match-card{border-radius:10px!important;border-color:var(--bdr)!important;box-shadow:var(--shadow)!important}.panel-header,.card-ttl{background:var(--s2)!important;color:var(--ink)!important;border-color:var(--bdr)!important;font-family:Arial,sans-serif!important;font-weight:800!important}.panel-body{background:#fff!important}.tab-content{animation:fadeIn .14s ease-out}.btn-primary,.btn-success,.btn-main{background:var(--grn)!important}.btn,.button,button{font-family:Arial,sans-serif}input,select,textarea{border-radius:7px!important;border-color:var(--bdr2)!important}input:focus,select:focus,textarea:focus{outline:2px solid rgba(26,122,58,.16)!important;border-color:var(--grn)!important}.floating-nav .float-btn{background:var(--ink)!important;color:#fff!important;border-radius:8px!important;box-shadow:var(--shadow)!important}.notice{border-radius:9px!important;box-shadow:var(--shadow2)!important}
+@keyframes fadeIn{from{opacity:.6;transform:translateY(2px)}to{opacity:1;transform:none}}
+@media(max-width:680px){body{padding:8px 7px 80px!important}.top-bar{padding:12px!important}.steps{padding:9px 4px;gap:0}.step{flex-direction:column;gap:4px;padding:2px;font-size:10px;flex:1}.step-n{width:27px;height:27px;flex-basis:27px}.step-ln{min-width:3px}.flex-subnav{padding:6px}.flex-subgroup button{padding:8px 9px;font-size:11px}.stats{width:100%}.stat-card{flex:1}}
+@media print{#flexStepNav,.flex-subnav,.top-bar .user-info,.floating-nav{display:none!important}body{background:#fff!important;padding:0!important}.container{max-width:none!important}}
 </style>
 
 </head>
@@ -2544,8 +2500,8 @@ input,select,textarea{accent-color:#1a7a3a}
 <div class="container">
     <div class="top-bar">
         <div class="logo">
-            <h1>🥒 PICKLE<span>BALL</span> 40</h1>
-            <div class="badge">Interclubs · 3-2-0</div>
+            <h1>🏓 PICKLE<span>BALL</span> INTERCLUBS</h1>
+            <div class="badge">Format E · Victoire 3 pts · Nul 1 pt</div>
         </div>
         <div class="stats">
             <div class="stat-card">P1 : <b><span id="p1Done">0</span>/<span id="p1Total">0</span></b></div>
@@ -2576,19 +2532,25 @@ input,select,textarea{accent-color:#1a7a3a}
         <span id="recapStats" class="recap-chip"></span>
     </div>
 
-
-    <nav class="rsth-step-nav" aria-label="Étapes du tournoi">
-      <button class="rsth-step" data-step="1" type="button" onclick="activateMainStep(1)"><span class="rsth-step-n">1</span><span>Config</span></button>
-      <span class="rsth-step-line"></span>
-      <button class="rsth-step" data-step="2" type="button" onclick="activateMainStep(2)"><span class="rsth-step-n">2</span><span>Équipes</span></button>
-      <span class="rsth-step-line"></span>
-      <button class="rsth-step" data-step="3" type="button" onclick="activateMainStep(3)"><span class="rsth-step-n">3</span><span>Planning</span></button>
-      <span class="rsth-step-line"></span>
-      <button class="rsth-step" data-step="4" type="button" onclick="activateMainStep(4)"><span class="rsth-step-n">4</span><span>Tournoi</span></button>
-      <span class="rsth-step-line"></span>
-      <button class="rsth-step" data-step="5" type="button" onclick="activateMainStep(5)"><span class="rsth-step-n">5</span><span>Classement</span></button>
+    <nav class="steps" id="flexStepNav" aria-label="Étapes du tournoi">
+      <button class="step" data-step="1" type="button" onclick="activateFlexibleStep(1)"><span class="step-n">1</span><span>Config</span></button>
+      <span class="step-ln"></span>
+      <button class="step active" data-step="2" type="button" onclick="activateFlexibleStep(2)"><span class="step-n">2</span><span>Équipes</span></button>
+      <span class="step-ln"></span>
+      <button class="step" data-step="3" type="button" onclick="activateFlexibleStep(3)"><span class="step-n">3</span><span>Planning</span></button>
+      <span class="step-ln"></span>
+      <button class="step" data-step="4" type="button" onclick="activateFlexibleStep(4)"><span class="step-n">4</span><span>Tournoi</span></button>
+      <span class="step-ln"></span>
+      <button class="step" data-step="5" type="button" onclick="activateFlexibleStep(5)"><span class="step-n">5</span><span>Classement</span></button>
     </nav>
-
+    <div class="flex-subnav" id="flexSubnav" aria-label="Outils de l’étape">
+      <div class="flex-subgroup" data-for-step="1"><button data-open-tab="config">⚙️ Configuration</button><button data-open-tab="reglement">📖 Règlement</button></div>
+      <div class="flex-subgroup" data-for-step="2"><button data-open-tab="teams">👥 Saisie des équipes</button></div>
+      <div class="flex-subgroup" data-for-step="3"><button data-open-tab="schedule">📅 Programme des matchs</button><button data-open-tab="planning">🗓️ Planning des équipes</button></div>
+      <div class="flex-subgroup" data-for-step="4"><button data-open-tab="phase1">🏐 Phase 1</button><button data-open-tab="rankingP1">📊 Classement P1</button><button data-open-tab="phase2">🏆 Phase 2</button><button data-open-tab="rankingP2">📊 Classement P2</button><button data-open-tab="finales">🥇 Matchs de classement</button></div>
+      <div class="flex-subgroup" data-for-step="5"><button data-open-tab="ranking">🏆 Classement final</button></div>
+      <div class="flex-subgroup flex-tools"><button data-open-tab="reglement">📖 Règlement</button><button data-open-tab="users" id="flexUsersShortcut" style="display:none">👥 Utilisateurs</button></div>
+    </div>
     <div class="tabs">
         <button class="tab" data-tab="config">⚙️ Config</button>
         <button class="tab active" data-tab="teams">🏷️ Équipes</button>
@@ -2732,51 +2694,31 @@ input,select,textarea{accent-color:#1a7a3a}
 <div id="notice" class="notice"></div>
 
 
-<script>
+<script id="rsth-flexible-navigation">
 (function(){
-  const tabForStep = {1:'config', 2:'teams', 3:'planning', 4:'phase1', 5:'ranking'};
-  const stepForTab = {
-    config:1, teams:2, planning:3, schedule:3,
-    phase1:4, rankingP1:4, phase2:4, rankingP2:4, finales:4, ranking:5,
-    reglement:1, users:1
-  };
-  window.activateMainStep = function(step){
-    const tab = document.querySelector('.tab[data-tab="'+tabForStep[step]+'"]');
-    if(tab) tab.click();
-    updateMainStepper(step);
-    if(step===3){
-      const p = document.getElementById('planningArea');
-      if(p && !p.innerHTML.trim()){
-        const scheduleTab = document.querySelector('.tab[data-tab="schedule"]');
-        if(scheduleTab) scheduleTab.click();
-      }
-    }
-  };
-  function updateMainStepper(step){
-    document.querySelectorAll('.rsth-step').forEach(btn=>{
-      const n = Number(btn.dataset.step);
-      btn.classList.toggle('active', n===step);
-      btn.classList.toggle('done', n<step);
-      const circle=btn.querySelector('.rsth-step-n');
-      if(circle) circle.textContent = n<step ? '✓' : String(n);
-    });
-    document.querySelectorAll('.rsth-step-line').forEach((line,i)=>{
-      line.classList.toggle('done', i+1<step);
-    });
-  }
-  function bind(){
-    document.querySelectorAll('.tab[data-tab]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const step=stepForTab[btn.dataset.tab];
-        if(step) updateMainStepper(step);
-      });
-    });
-    const active=document.querySelector('.tab.active');
-    const initial=active ? (stepForTab[active.dataset.tab]||2) : 2;
-    updateMainStepper(initial);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind,{once:true});
-  else bind();
+ const tabStep={config:1,teams:2,schedule:3,planning:3,phase1:4,rankingP1:4,phase2:4,rankingP2:4,finales:4,ranking:5,reglement:1,users:1};
+ const defaultTab={1:'config',2:'teams',3:'schedule',4:'phase1',5:'ranking'};
+ function openTab(id){const b=document.querySelector('.tab[data-tab="'+id+'"]');if(b)b.click();refresh();}
+ function activateStep(n){openTab(defaultTab[n]||'teams');}
+ function refresh(){
+   const active=document.querySelector('.tab.active[data-tab]');const id=active?active.dataset.tab:'teams';let step=tabStep[id]||2;
+   document.querySelectorAll('#flexStepNav .step').forEach(b=>{const n=Number(b.dataset.step);b.classList.toggle('active',n===step);b.classList.toggle('done',n<step);const c=b.querySelector('.step-n');if(c)c.textContent=n<step?'✓':String(n);});
+   document.querySelectorAll('#flexStepNav .step-ln').forEach((l,i)=>l.classList.toggle('done',i+1<step));
+   document.querySelectorAll('.flex-subgroup[data-for-step]').forEach(g=>g.classList.toggle('active',Number(g.dataset.forStep)===step));
+   document.querySelectorAll('.flex-subgroup button[data-open-tab]').forEach(b=>b.classList.toggle('active',b.dataset.openTab===id));
+   const usersOriginal=document.getElementById('usersTabBtn');const usersShortcut=document.getElementById('flexUsersShortcut');if(usersOriginal&&usersShortcut)usersShortcut.style.display=usersOriginal.style.display==='none'?'none':'inline-block';
+ }
+ window.activateFlexibleStep=activateStep;
+ document.addEventListener('click',e=>{const b=e.target.closest('[data-open-tab]');if(b){e.preventDefault();openTab(b.dataset.openTab);}});
+ document.addEventListener('DOMContentLoaded',()=>{
+   refresh();
+   document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',()=>setTimeout(refresh,0)));
+   // The original app creates and activates its tabs from its own script; keep the stepper synced with those changes.
+   const obs=new MutationObserver(()=>refresh());document.querySelectorAll('.tab').forEach(b=>obs.observe(b,{attributes:true,attributeFilter:['class','style']}));
+   setInterval(refresh,900);
+ },{once:true});
+ // Expose a simple alias for buttons and deep-links.
+ window.switchFlexibleTab=openTab;
 })();
 </script>
 
