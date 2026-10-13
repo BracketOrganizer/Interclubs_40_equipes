@@ -2131,6 +2131,9 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             if(matchesFinales.length) renderFinalesUI();
             updateGlobalRanking(); updateCounters(); renderSchedule(); renderPlanning();
             updateTopRecap(); // also calls updateFormatUI
+            if(document.getElementById('liveDesk')?.style.display==='flex') renderLiveDesk();
+            if(document.getElementById('scoreDesk')?.style.display==='flex') renderScoreDesk();
+            if(document.getElementById('tvDesk')?.style.display==='flex') renderTVDesk();
         }
 
         async function startRealtimeSync(){
@@ -2160,6 +2163,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             if(mainApp) mainApp.style.display='block';
 
             if(user){
+                const loginDesk=document.getElementById('loginDesk');if(loginDesk){loginDesk.style.display='none';loginDesk.setAttribute('aria-hidden','true');}
                 currentUser=user;
                 const adminEmails=["yves.cerisier@orange.fr","quinquin44@gmail.com","checheux@gmail.com"];
                 isAdmin=adminEmails.includes(user.email);
@@ -2336,15 +2340,98 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             });
         }
 
+        // ============ INTERFACE RSTH : LIVE / ADMIN / ÉCRAN / SAISIE GUIDÉE ============
+        let scoreDeskPhase='P1', scoreDeskMode='terrain', scoreDeskSearch='', scoreDeskState='WAIT';
+        let tvRotationTimer=null, tvRotationOn=true, tvScreenIndex=0, liveStatusUnsub=null, liveIsPublished=true;
+        const phaseLabel={P1:'Phase 1',P2:'Phase 2',FIN:'Matchs de classement'};
+        function listForPhase(ph){return ph==='P1'?matchesP1:ph==='P2'?matchesP2:matchesFinales;}
+        function allMatchRecords(){return [{phase:'P1',list:matchesP1},{phase:'P2',list:matchesP2},{phase:'FIN',list:matchesFinales}].flatMap(x=>x.list.map(m=>({...m,__phase:x.phase})));}
+        function teamDisplay(t){return (t&&t.club)||'Équipe à définir';}
+        function matchGroup(m){return m.group||m.groupName||m.groupPair||m.category||'';}
+        function matchSearchText(m){return [teamDisplay(m.team1),teamDisplay(m.team2),matchGroup(m),m.terrain?'T'+m.terrain:'',m.startTime||'',m.__phase||''].join(' ').toLowerCase();}
+        window.openLoginDesk=function(){const el=document.getElementById('loginDesk');if(el){el.style.display='flex';el.setAttribute('aria-hidden','false');document.body.classList.add('desk-open');setTimeout(()=>document.getElementById('loginDeskEmail')?.focus(),80);}};
+        window.loginDeskGoogle=async function(){const msg=document.getElementById('loginDeskMsg');try{if(msg)msg.textContent='Connexion Google en cours…';await signInWithPopup(auth,provider);if(msg)msg.textContent='Connexion réussie.';}catch(e){if(msg)msg.textContent='Connexion impossible : '+(e.message||e.code);}};
+        window.loginDeskEmail=async function(){const email=document.getElementById('loginDeskEmail')?.value?.trim()||'',password=document.getElementById('loginDeskPassword')?.value||'',msg=document.getElementById('loginDeskMsg');if(!email||!password){if(msg)msg.textContent='Renseigne ton email et ton mot de passe.';return;}try{if(msg)msg.textContent='Connexion en cours…';await signInWithEmailAndPassword(auth,email,password);if(msg)msg.textContent='Connexion réussie.';}catch(e){if(msg)msg.textContent=(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password')?'Email ou mot de passe incorrect.':(e.message||e.code);}};
+        function showDesk(id){const el=document.getElementById(id);if(!el)return;el.style.display='flex';el.setAttribute('aria-hidden','false');document.body.classList.add('desk-open');}
+        window.closeDesk=function(id){const el=document.getElementById(id);if(el){el.style.display='none';el.setAttribute('aria-hidden','true');}if(!['loginDesk','liveDesk','adminDesk','scoreDesk','tvDesk'].some(x=>document.getElementById(x)?.style.display==='flex'))document.body.classList.remove('desk-open');if(id==='tvDesk'&&tvRotationTimer){clearInterval(tvRotationTimer);tvRotationTimer=null;} };
+        window.openLiveDesk=function(){showDesk('liveDesk');renderLiveDesk();};
+        window.openAdminDesk=function(){showDesk('adminDesk');const allowed=!!isAdmin;document.getElementById('adminDeskNoAccess').style.display=allowed?'none':'block';document.getElementById('adminDeskContent').style.display=allowed?'block':'none';if(allowed)refreshLivePublishButton();};
+        window.openScoreDesk=function(phase='P1'){scoreDeskPhase=phase;scoreDeskMode='terrain';showDesk('scoreDesk');renderScoreDesk();};
+        window.setScoreDeskPhase=function(phase){scoreDeskPhase=phase;renderScoreDesk();};
+        window.setScoreDeskMode=function(mode){scoreDeskMode=mode;renderScoreDesk();};
+        function scoreSections(){
+          const list=listForPhase(scoreDeskPhase)||[];
+          let keyFn=m=>scoreDeskMode==='terrain'?'Terrain '+(m.terrain||'—'):scoreDeskMode==='groupe'?(matchGroup(m)||'Sans groupe'):'Tous les matchs';
+          const map=new Map();list.forEach(m=>{const k=keyFn(m);if(!map.has(k))map.set(k,[]);map.get(k).push(m);});
+          return [...map.entries()].map(([label,matches])=>({label,matches:matches.slice().sort((a,b)=>((a.startTime||'').localeCompare(b.startTime||'')))})).sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true}));
+        }
+        function phaseMatchSummary(ph){const a=listForPhase(ph)||[];return {done:a.filter(isPlayed).length,total:a.length};}
+        window.renderScoreDesk=function(){
+          const content=document.getElementById('scoreDeskContent');if(!content)return;
+          document.querySelectorAll('[data-score-phase]').forEach(b=>b.classList.toggle('active',b.dataset.scorePhase===scoreDeskPhase));
+          document.querySelectorAll('[data-score-mode]').forEach(b=>b.classList.toggle('active',b.dataset.scoreMode===scoreDeskMode));
+          document.getElementById('scoreDeskSubtitle').textContent=phaseLabel[scoreDeskPhase]+' · choisis le terrain ou la poule, puis saisis les deux scores. Les classements se recalculent automatiquement.';
+          scoreDeskState=document.getElementById('scoreStateFilter')?.value||'WAIT';scoreDeskSearch=(document.getElementById('scoreSearch')?.value||'').trim().toLowerCase();
+          const sections=scoreSections();let total=listForPhase(scoreDeskPhase).length,done=listForPhase(scoreDeskPhase).filter(isPlayed).length;
+          document.getElementById('scoreDeskProgress').innerHTML=`<div><b>${done}/${total}</b> matchs enregistrés</div><div class="score-progress-track"><span style="width:${total?done/total*100:0}%"></span></div><div>${total?Math.round(done/total*100):0}%</div>`;
+          let html='';
+          sections.forEach(section=>{
+            const ms=section.matches.filter(m=>{const played=isPlayed(m);if(scoreDeskState==='WAIT'&&played)return false;if(scoreDeskState==='PLAYED'&&!played)return false;return !scoreDeskSearch||matchSearchText({...m,__phase:scoreDeskPhase}).includes(scoreDeskSearch)||section.label.toLowerCase().includes(scoreDeskSearch);});
+            if(!ms.length)return;
+            html+=`<section class="score-section"><header><b>${esc(section.label)}</b><span>${ms.filter(isPlayed).length}/${ms.length} scores affichés</span></header>`;
+            ms.forEach(m=>{
+              const s1=m.score1??'',s2=m.score2??'',played=isPlayed(m),n1=Number(s1),n2=Number(s2),win1=played&&n1>n2,win2=played&&n2>n1;
+              const mid=String(m.id).replace(/'/g,'');const meta=[m.startTime?'🕒 '+m.startTime:'',m.terrain?'🎾 Terrain '+m.terrain:'',matchGroup(m)].filter(Boolean).join(' · ');
+              html+=`<article class="score-match ${played?'is-played':''}" data-score-match="${esc(scoreDeskPhase+'-'+mid)}"><div class="score-match-meta"><span>${esc(meta||phaseLabel[scoreDeskPhase])}</span><span class="score-match-state">${played?'✅ Enregistré':'🟡 En attente'}</span></div><div class="score-match-row"><div class="score-team team-left ${win1?'winner':''}"><b>${esc(teamDisplay(m.team1))}</b><small>${esc([m.team1?.player1,m.team1?.player2].filter(Boolean).join(' / '))}</small></div><div class="score-control"><button aria-label="Diminuer score équipe 1" onclick="adjustDeskScore('${scoreDeskPhase}','${mid}',1,-1)">−</button><input aria-label="Score ${esc(teamDisplay(m.team1))}" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${esc(s1)}" placeholder="–" onchange="setDeskScore('${scoreDeskPhase}','${mid}',1,this.value)" onkeydown="scoreDeskKey(event,'${scoreDeskPhase}','${mid}',1,this)"><span>–</span><input aria-label="Score ${esc(teamDisplay(m.team2))}" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${esc(s2)}" placeholder="–" onchange="setDeskScore('${scoreDeskPhase}','${mid}',2,this.value)" onkeydown="scoreDeskKey(event,'${scoreDeskPhase}','${mid}',2,this)"><button aria-label="Augmenter score équipe 2" onclick="adjustDeskScore('${scoreDeskPhase}','${mid}',2,1)">+</button></div><div class="score-team team-right ${win2?'winner':''}"><b>${esc(teamDisplay(m.team2))}</b><small>${esc([m.team2?.player1,m.team2?.player2].filter(Boolean).join(' / '))}</small></div></div><div class="score-match-actions"><div class="score-quick-pair"><div><small>Score équipe 1</small><div class="score-quickset">${[6,7,8,9,10,11,12,13,14,15].map(n=>`<button onclick="setDeskScore('${scoreDeskPhase}','${mid}',1,${n})">${n}</button>`).join('')}</div></div><div><small>Score équipe 2</small><div class="score-quickset">${[6,7,8,9,10,11,12,13,14,15].map(n=>`<button onclick="setDeskScore('${scoreDeskPhase}','${mid}',2,${n})">${n}</button>`).join('')}</div></div></div><div class="score-bottom-actions"><button class="score-clear" onclick="clearDeskScore('${scoreDeskPhase}','${mid}')">Effacer le score</button><button class="score-next" onclick="focusNextScore('${scoreDeskPhase}','${mid}')">⏭️ Suivant</button></div></div></article>`;
+            });html+='</section>';
+          });
+          content.innerHTML=html||'<div class="desk-empty">Aucun match ne correspond à ce filtre. Essaie « Tous les matchs » ou enlève la recherche.</div>';
+          const status=document.getElementById('scoreDeskStatus');if(status)status.textContent=(isAdmin||isSaisie)?'Les modifications sont enregistrées automatiquement dans le tournoi.':'Mode consultation : connecte-toi pour saisir les scores.';
+          content.querySelectorAll('input').forEach(i=>i.disabled=!(isAdmin||isSaisie));content.querySelectorAll('button').forEach(b=>{if(!b.classList.contains('score-next'))b.disabled=!(isAdmin||isSaisie);});
+        };
+        function findDeskMatch(ph,id){return listForPhase(ph).find(m=>String(m.id)===String(id));}
+        function updateAfterScore(ph){const desk=document.getElementById('scoreDesk');const scrollTop=desk?.scrollTop||0;if(ph==='P1'){renderPhase1UI();renderRankingP1();}else if(ph==='P2'){renderPhase2UI();renderRankingP2();}else renderFinalesUI();updateGlobalRanking();renderSchedule();renderPlanning();updateCounters();updateTopRecap();saveData();renderScoreDesk();if(desk)desk.scrollTop=scrollTop;renderLiveDesk();if(document.getElementById('tvDesk')?.style.display==='flex')renderTVDesk();}
+        window.setDeskScore=function(ph,id,side,val){if(!isAdmin&&!isSaisie){showMsg('🔒 Connecte-toi pour saisir un résultat');return;}const m=findDeskMatch(ph,id);if(!m)return;let raw=String(val??'').replace(/[^0-9]/g,'').slice(0,2);if(side===1)m.score1=raw;else m.score2=raw;updateAfterScore(ph);};
+        window.adjustDeskScore=function(ph,id,side,delta){if(!isAdmin&&!isSaisie){showMsg('🔒 Connecte-toi pour saisir un résultat');return;}const m=findDeskMatch(ph,id);if(!m)return;let key=side===1?'score1':'score2';let cur=m[key]===''||m[key]==null?0:parseInt(m[key])||0;m[key]=String(Math.max(0,Math.min(99,cur+delta)));updateAfterScore(ph);};
+        window.clearDeskScore=function(ph,id){if(!isAdmin&&!isSaisie)return;const m=findDeskMatch(ph,id);if(!m)return;m.score1='';m.score2='';updateAfterScore(ph);};
+        window.scoreDeskKey=function(e,ph,id,side,input){if(e.key==='Enter'){e.preventDefault();const v=input.value;setDeskScore(ph,id,side,v);setTimeout(()=>focusNextScore(ph,id),80);}};
+        window.focusNextScore=function(ph,id){const list=listForPhase(ph);const idx=list.findIndex(m=>String(m.id)===String(id));const next=list.slice(idx+1).concat(list.slice(0,idx+1)).find(m=>!isPlayed(m));if(!next){showMsg('Tous les matchs de cette phase ont un score.');return;}const search=document.getElementById('scoreSearch');if(search)search.value='';const state=document.getElementById('scoreStateFilter');if(state)state.value='WAIT';renderScoreDesk();setTimeout(()=>{const el=document.querySelector(`[data-score-match="${ph}-${String(next.id).replace(/'/g,'')}"]`);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.querySelector('input')?.focus();}},50);};
+        window.jumpToNextUnplayed=function(){const list=listForPhase(scoreDeskPhase);const next=list.find(m=>!isPlayed(m));if(next)focusNextScore(scoreDeskPhase,String(next.id));else showMsg('Tous les matchs de cette phase ont un score.');};
+        window.renderLiveDesk=function(){
+          const el=document.getElementById('liveDeskContent');if(!el)return;const a=phaseMatchSummary('P1'),b=phaseMatchSummary('P2'),c=phaseMatchSummary('FIN');
+          document.getElementById('liveP1Pill').textContent=`Phase 1 : ${a.done}/${a.total}`;document.getElementById('liveP2Pill').textContent=`Phase 2 : ${b.done}/${b.total}`;document.getElementById('liveFinPill').textContent=`Classement : ${c.done}/${c.total}`;
+          const ph=document.getElementById('livePhaseFilter')?.value||'ALL',state=document.getElementById('liveStateFilter')?.value||'ALL',q=(document.getElementById('liveSearch')?.value||'').trim().toLowerCase();
+          const rows=allMatchRecords().filter(m=>(ph==='ALL'||m.__phase===ph)&&(state==='ALL'||(state==='PLAYED'?isPlayed(m):!isPlayed(m)))&&(!q||matchSearchText(m).includes(q))).sort((x,y)=>(x.__phase||'').localeCompare(y.__phase||'')||(x.startTime||'').localeCompare(y.startTime||'')||(x.terrain||999)-(y.terrain||999));
+          el.innerHTML=rows.length?rows.map(m=>{const played=isPlayed(m),s1=played?m.score1:'—',s2=played?m.score2:'—',w1=played&&Number(s1)>Number(s2),w2=played&&Number(s2)>Number(s1);return `<article class="live-match-card"><div class="live-match-top"><b>${phaseLabel[m.__phase]}</b><span>${m.startTime?'🕒 '+esc(m.startTime):''} ${m.terrain?'· 🎾 T'+m.terrain:''}</span></div><div class="live-team-row ${w1?'live-winner':''}"><span>${esc(teamDisplay(m.team1))}</span><strong>${esc(s1)}</strong></div><div class="live-team-row ${w2?'live-winner':''}"><span>${esc(teamDisplay(m.team2))}</span><strong>${esc(s2)}</strong></div><div class="live-match-bottom"><span>${esc(matchGroup(m)||'')}</span><span class="${played?'live-done':'live-wait'}">${played?(w1?'Victoire équipe 1':w2?'Victoire équipe 2':'Égalité'):'En attente du résultat'}</span></div></article>`;}).join(''):'<div class="desk-empty">Aucun match à afficher pour ces critères.</div>';
+          document.getElementById('liveDeskMeta').textContent=`${teams.length} équipes · actualisation automatique · dernière mise à jour ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
+        };
+        window.toggleLivePublish=async function(){if(!isAdmin){showMsg('🔒 Réservé à l’administrateur');return;}liveIsPublished=!liveIsPublished;refreshLivePublishButton();try{await setDoc(doc(db,'tournoi','status_flexible'),{liveOpen:liveIsPublished,updatedAt:new Date().toISOString(),updatedBy:currentUser?.email||''},{merge:true});showMsg(liveIsPublished?'📡 Publication live ouverte':'🔴 Publication live fermée');}catch(e){showMsg('État local modifié, mais synchronisation impossible : '+e.message);}};
+        function refreshLivePublishButton(){const b=document.getElementById('livePublishToggle');if(b){b.textContent=liveIsPublished?'🟢 Live ouvert':'🔴 Live fermé';b.classList.toggle('is-closed',!liveIsPublished);}}
+        function watchLivePublish(){try{if(liveStatusUnsub)return;liveStatusUnsub=onSnapshot(doc(db,'tournoi','status_flexible'),snap=>{if(snap.exists()){liveIsPublished=snap.data().liveOpen!==false;refreshLivePublishButton();}},()=>{});}catch(e){}}
+        window.openTVDesk=function(){showDesk('tvDesk');tvScreenIndex=0;renderTVDesk();if(tvRotationTimer)clearInterval(tvRotationTimer);tvRotationTimer=setInterval(()=>{if(tvRotationOn){tvScreenIndex++;renderTVDesk();}},12000);};
+        window.toggleTVRotation=function(){tvRotationOn=!tvRotationOn;const b=document.getElementById('tvRotationBtn');if(b)b.textContent=tvRotationOn?'⏸ Pause défilement':'▶ Reprendre défilement';};
+        window.toggleTVFullscreen=function(){const el=document.getElementById('tvDesk');if(!document.fullscreenElement)el.requestFullscreen?.().catch(()=>{});else document.exitFullscreen?.();};
+        window.renderTVDesk=function(){const el=document.getElementById('tvDeskContent');if(!el)return;const screens=[renderTVProgress(),renderTVMatches('P1'),renderTVMatches('P2'),renderTVRanking()];tvScreenIndex=((tvScreenIndex%screens.length)+screens.length)%screens.length;el.innerHTML=screens[tvScreenIndex];document.getElementById('tvDeskSubtitle').textContent=['AVANCEMENT DU TOURNOI','PHASE 1 · RÉSULTATS','PHASE 2 · RÉSULTATS','CLASSEMENT GÉNÉRAL'][tvScreenIndex];document.getElementById('tvDeskProgress').textContent=`Écran ${tvScreenIndex+1}/${screens.length} · actualisé à ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;};
+        function renderTVProgress(){const p1=phaseMatchSummary('P1'),p2=phaseMatchSummary('P2'),f=phaseMatchSummary('FIN'),tot=p1.total+p2.total+f.total,done=p1.done+p2.done+f.done;return `<div class="tv-summary"><div class="tv-title">LE TOURNOI EN DIRECT</div><div class="tv-big-number">${teams.length} <small>ÉQUIPES</small></div><div class="tv-progress-grid">${[['PHASE 1',p1],['PHASE 2',p2],['CLASSEMENT',f]].map(([name,v])=>`<div><span>${name}</span><b>${v.done} / ${v.total}</b><i><em style="width:${v.total?v.done/v.total*100:0}%"></em></i></div>`).join('')}</div><div class="tv-total">${done} / ${tot} MATCHS RENSEIGNÉS</div></div>`;}
+        function renderTVMatches(ph){const arr=listForPhase(ph).slice().sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||'')||(a.terrain||99)-(b.terrain||99));const chosen=arr.filter(isPlayed).slice(-8).reverse();const waiting=arr.filter(m=>!isPlayed(m)).slice(0,4);const rows=[...chosen,...waiting].slice(0,10);return `<div class="tv-results"><div class="tv-title">${phaseLabel[ph].toUpperCase()}</div><div class="tv-results-grid">${rows.map(m=>`<div class="tv-result-card"><div class="tv-result-meta">${m.startTime?'🕒 '+esc(m.startTime):''} ${m.terrain?'· TERRAIN '+m.terrain:''} · ${esc(matchGroup(m)||'')}</div><div class="tv-result-team"><span>${esc(teamDisplay(m.team1))}</span><b>${isPlayed(m)?esc(m.score1):'—'}</b></div><div class="tv-result-team"><span>${esc(teamDisplay(m.team2))}</span><b>${isPlayed(m)?esc(m.score2):'—'}</b></div></div>`).join('')||'<div class="tv-empty">Les matchs seront affichés après leur génération.</div>'}</div></div>`;}
+        function renderTVRanking(){const area=document.getElementById('rankingArea');return `<div class="tv-ranking"><div class="tv-title">CLASSEMENT GÉNÉRAL</div>${area?.innerText?`<div class="tv-ranking-content">${area.innerHTML}</div>`:`<div class="tv-empty">Le classement apparaîtra après la saisie des résultats.</div>`}</div>`;}
+        // Le système de saisie par terrain/poule ouvre désormais le bureau guidé plus lisible.
+        window.openScoreModalByGroupe=function(phase){window.openScoreDesk(phase);};
+        window.openScoreModalByTerrain=function(phase){scoreDeskPhase=phase;scoreDeskMode='terrain';showDesk('scoreDesk');renderScoreDesk();};
+
+        window.adminGenerateFlexible=function(action){if(!isAdmin){showMsg('🔒 Accès administrateur requis');return;}const labels={P1:'Générer les matchs de Phase 1 ?',P2:'Générer les matchs de Phase 2 ?',FIN:'Générer les matchs de classement ?',HORAIRES:'Recalculer les horaires du tournoi ?'};if(!confirm(labels[action]||'Confirmer cette action ?'))return;if(action==='P1')genPhase1();else if(action==='P2')genPhase2();else if(action==='FIN')genMatchesFinales();else if(action==='HORAIRES')genHoraires();closeDesk('adminDesk');};
+
         function startApp(){
             document.getElementById('mainApp').style.display='block';
             document.getElementById('loginOverlay').style.display='none';
             document.body.classList.add('readonly-mode');
             attachEvents();
+            watchLivePublish();
             updateFormatUI(); // masquer onglet/bouton finales si format non-E dès le départ
             onAuthStateChanged(auth,(user)=>{ updateUIForUser(user); });
         }
 
+        document.addEventListener('keydown',e=>{if(e.key==='Escape'){['loginDesk','liveDesk','adminDesk','scoreDesk','tvDesk'].forEach(id=>{if(document.getElementById(id)?.style.display==='flex')window.closeDesk(id);});}});
         document.addEventListener('DOMContentLoaded',startApp);
 
         // Exposer
@@ -2491,6 +2578,18 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
 @keyframes fadeIn{from{opacity:.6;transform:translateY(2px)}to{opacity:1;transform:none}}
 @media(max-width:680px){body{padding:8px 7px 80px!important}.top-bar{padding:12px!important}.steps{padding:9px 4px;gap:0}.step{flex-direction:column;gap:4px;padding:2px;font-size:10px;flex:1}.step-n{width:27px;height:27px;flex-basis:27px}.step-ln{min-width:3px}.flex-subnav{padding:6px}.flex-subgroup button{padding:8px 9px;font-size:11px}.stats{width:100%}.stat-card{flex:1}}
 @media print{#flexStepNav,.flex-subnav,.top-bar .user-info,.floating-nav{display:none!important}body{background:#fff!important;padding:0!important}.container{max-width:none!important}}
+
+        /* RSTH-style quick actions and tournament workspaces */
+        .rsth-quickbar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#e9eef6;border:1px solid #cbd5e4;border-radius:13px;padding:10px 14px;margin:0 0 14px;box-shadow:0 3px 10px #1a25400a}
+        .rsth-quickbar-label{font-size:.67rem;font-weight:900;letter-spacing:1.2px;color:#263b5d;white-space:nowrap}.rsth-quickbar-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.rq-btn{border:0;border-radius:8px;padding:9px 13px;font-weight:800;font-size:.75rem;cursor:pointer;box-shadow:0 2px 4px #00000012;transition:transform .15s,filter .15s}.rq-btn:hover{transform:translateY(-1px);filter:brightness(1.04)}.rq-admin{background:#1a2540;color:#fff}.rq-score{background:#1a7a3a;color:#fff}.rq-live{background:#fff;color:#1a4a7a;border:1px solid #b8c9df}.rq-screen{background:#dbeafe;color:#1d3c67;border:1px solid #a8c5ea}
+        .desk-overlay{display:none;position:fixed;inset:0;z-index:12000;background:#101a2aee;overflow:auto;align-items:flex-start;justify-content:center;padding:18px;box-sizing:border-box}.desk-shell{width:min(1240px,100%);min-height:calc(100vh - 36px);background:#f4f7fb;color:#17243a;border-radius:18px;overflow:hidden;box-shadow:0 22px 70px #0007}.desk-head{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#1a2540;color:#fff;padding:19px 23px}.desk-head h2{font-size:1.35rem;margin:3px 0 4px}.desk-head p{margin:0;color:#c7d4e6;font-size:.8rem}.desk-kicker{font-size:.62rem;letter-spacing:1.8px;font-weight:900;color:#8bd0a1}.desk-close{border:1px solid #ffffff55;background:#ffffff10;color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;white-space:nowrap}.desk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 20px;background:#e5ebf4;border-bottom:1px solid #d2dbe8;flex-wrap:wrap}.desk-pills{display:flex;gap:8px;flex-wrap:wrap}.desk-pills span{background:#fff;border:1px solid #d0dae8;border-radius:20px;padding:7px 11px;font-size:.72rem;font-weight:800}.desk-action{border:0;border-radius:8px;background:#1a7a3a;color:white;font-weight:800;padding:10px 13px;cursor:pointer}.desk-filter{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:14px 20px;background:#fff;border-bottom:1px solid #dce3ed}.desk-filter label{display:flex;flex-direction:column;gap:5px;color:#53627a;font-size:.68rem;font-weight:800}.desk-filter select,.desk-filter input{border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:9px 10px;color:#17243a;min-width:150px;font:inherit;font-size:.8rem}.desk-search{flex:1;min-width:210px}.desk-search input{width:100%;box-sizing:border-box}.live-grid{padding:18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.live-match-card{background:#fff;border:1px solid #d6deea;border-radius:12px;padding:13px;box-shadow:0 3px 8px #14243b0a}.live-match-top,.live-match-bottom{display:flex;justify-content:space-between;gap:8px;align-items:center;color:#63718a;font-size:.67rem;margin-bottom:8px}.live-match-top b{color:#1a4a7a;text-transform:uppercase;letter-spacing:.4px}.live-team-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 9px;border-radius:7px;background:#f2f5fa;margin:4px 0;font-weight:700;font-size:.86rem}.live-team-row strong{font-size:1.35rem;font-family:'DM Mono',monospace;min-width:28px;text-align:center}.live-winner{background:#e2f4e8;color:#14632f}.live-done{color:#16703a;font-weight:800}.live-wait{color:#9a6a10;font-weight:700}.live-match-bottom{margin:8px 0 0}.desk-empty{margin:20px;padding:30px;background:#fff;border:1px dashed #b8c7da;border-radius:12px;text-align:center;color:#687890;font-weight:700;grid-column:1/-1}
+        .admin-shell{max-width:980px}.admin-actions-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:18px}.admin-actions-grid button{display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;background:#fff;border:1px solid #d5deea;border-radius:12px;padding:17px;color:#1a2540;cursor:pointer}.admin-actions-grid button b{font-size:.95rem}.admin-actions-grid button span{font-size:.75rem;color:#66748a}.admin-live-control{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:0 18px;padding:15px;background:#e7f3eb;border:1px solid #b9ddc5;border-radius:12px}.admin-live-control p{font-size:.74rem;color:#506a5a;margin:5px 0 0}.desk-action.is-closed{background:#9c2f2f}.admin-noaccess{margin:22px;padding:25px;border:1px solid #e7c4c4;background:#fff2f2;color:#9c2f2f;border-radius:12px;text-align:center;font-weight:800;line-height:2}
+        .score-shell{max-width:1180px}.score-toolbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 20px;background:#e6edf6;border-bottom:1px solid #d2dce9}.score-phase-tabs,.score-mode-tabs{display:flex;gap:5px;flex-wrap:wrap}.score-phase-tabs button,.score-mode-tabs button{border:1px solid #c5d0df;background:#fff;color:#30415c;border-radius:8px;padding:8px 11px;font-weight:800;font-size:.73rem;cursor:pointer}.score-phase-tabs button.active,.score-mode-tabs button.active{background:#1a2540;color:#fff;border-color:#1a2540}.score-progress{display:flex;align-items:center;gap:12px;padding:12px 20px;font-size:.75rem;font-weight:800;color:#465875}.score-progress-track{height:8px;background:#d8e1ed;border-radius:10px;overflow:hidden;flex:1}.score-progress-track span{display:block;height:100%;background:#1a7a3a;transition:width .2s}.score-desk-list{padding:0 18px 20px}.score-section{margin-top:14px}.score-section>header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 13px;background:#1a4a7a;color:white;border-radius:9px 9px 0 0;font-size:.8rem}.score-section>header span{font-size:.68rem;opacity:.85}.score-match{background:#fff;border:1px solid #d4deea;border-top:0;padding:13px;border-radius:0 0 10px 10px;margin-bottom:9px}.score-match.is-played{border-left:4px solid #21854a}.score-match-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#66758d;font-size:.67rem;margin-bottom:10px}.score-match-state{font-weight:800}.score-match-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:14px;align-items:center}.score-team{display:flex;flex-direction:column;gap:4px;min-width:0}.score-team b{font-size:.9rem;overflow-wrap:anywhere}.score-team small{color:#738097;font-size:.65rem}.team-left{text-align:right}.team-right{text-align:left}.score-team.winner b{color:#16713b}.score-control{display:flex;align-items:center;gap:6px}.score-control button{width:33px;height:39px;border:0;border-radius:7px;background:#e4ebf4;color:#1a2540;font-size:1.3rem;font-weight:900;cursor:pointer}.score-control input{width:57px;height:49px;text-align:center;border:2px solid #b9c8db;border-radius:9px;background:#f7f9fc;font-family:'DM Mono',monospace;font-size:1.55rem;font-weight:900;color:#17243a;box-sizing:border-box}.score-control span{font-weight:900;color:#8090a6}.score-match-actions{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}.score-quick-pair{display:flex;gap:12px;flex-wrap:wrap}.score-quick-pair>div>small{display:block;color:#75839a;font-size:.58rem;font-weight:800;margin-bottom:4px}.score-bottom-actions{display:flex;gap:6px}.score-quickset{display:flex;gap:4px;flex-wrap:wrap}.score-quickset button{border:1px solid #d3dce8;background:#f4f7fb;color:#354761;border-radius:6px;padding:5px 8px;font-size:.68rem;font-weight:800;cursor:pointer}.score-clear,.score-next{border:1px solid #d0d9e6;border-radius:7px;background:#fff;padding:7px 9px;font-size:.68rem;font-weight:800;color:#485a74;cursor:pointer}.score-next{background:#e7f4eb;color:#176a36;border-color:#b9ddc5}.score-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 20px;background:#e6edf6;color:#53627a;font-size:.72rem;position:sticky;bottom:0}.score-control button:disabled,.score-quickset button:disabled,.score-clear:disabled{opacity:.35;cursor:not-allowed}
+        .tv-overlay{display:none;position:fixed;inset:0;z-index:13000;background:#071327;color:white;overflow:hidden;flex-direction:column;font-family:Arial,sans-serif}.tv-topline{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 24px;background:#122644;border-bottom:3px solid #21864b;font-size:1rem;font-weight:900;letter-spacing:1px}.tv-topline span{color:#94d7ad;margin-left:18px;font-size:.8rem}.tv-top-actions{display:flex;gap:7px}.tv-top-actions button{border:1px solid #ffffff44;background:#ffffff12;color:#fff;border-radius:7px;padding:8px 10px;font-weight:800;cursor:pointer}.tv-content{flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:25px;overflow:auto}.tv-footer{display:flex;justify-content:space-between;padding:9px 24px;background:#122644;color:#aabbd1;font-size:.68rem;letter-spacing:1px}.tv-summary,.tv-results,.tv-ranking{width:100%;max-width:1600px;margin:auto}.tv-title{text-align:center;font-size:clamp(1.5rem,3vw,3rem);font-weight:900;letter-spacing:2px;color:#8bd0a1;margin-bottom:24px}.tv-big-number{text-align:center;font-size:clamp(4rem,12vw,9rem);font-weight:900;line-height:1}.tv-big-number small{font-size:.23em;letter-spacing:2px;color:#afc1d8}.tv-progress-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin:35px auto;max-width:1200px}.tv-progress-grid>div{background:#112644;border:1px solid #2c4567;border-radius:15px;padding:22px}.tv-progress-grid span,.tv-progress-grid b{display:block}.tv-progress-grid span{color:#a9bdd5;font-size:1rem;font-weight:800}.tv-progress-grid b{font-size:clamp(1.7rem,3vw,3rem);margin:12px 0}.tv-progress-grid i{display:block;height:10px;background:#273d5c;border-radius:10px;overflow:hidden}.tv-progress-grid em{display:block;height:100%;background:#36a75f}.tv-total{text-align:center;font-size:clamp(1.2rem,2.3vw,2rem);font-weight:900;letter-spacing:2px}.tv-results-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.tv-result-card{background:#102440;border:1px solid #2b4567;border-radius:12px;padding:12px 16px}.tv-result-meta{font-size:.68rem;color:#a9bdd5;margin-bottom:8px}.tv-result-team{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font-size:clamp(.9rem,1.5vw,1.4rem);font-weight:800}.tv-result-team b{font-size:1.5em;color:#91d9a8;font-family:'DM Mono',monospace}.tv-empty{text-align:center;color:#b4c6dc;font-size:1.3rem;margin:auto}.tv-ranking-content{max-height:70vh;overflow:hidden;background:white;color:#17243a;border-radius:12px;padding:10px}.tv-ranking-content *{font-size:clamp(.6rem,1vw,.9rem)!important}
+        @media(max-width:760px){.rsth-quickbar{align-items:flex-start;flex-direction:column}.rsth-quickbar-actions{justify-content:flex-start;width:100%}.rq-btn{flex:1;min-width:135px}.desk-overlay{padding:0}.desk-shell{min-height:100vh;border-radius:0}.desk-head{padding:14px;align-items:flex-start}.desk-head h2{font-size:1.1rem}.desk-head p{font-size:.7rem}.desk-close{font-size:.68rem;padding:8px}.live-grid{grid-template-columns:1fr;padding:10px}.desk-filter{padding:11px}.admin-actions-grid{grid-template-columns:1fr;padding:12px}.admin-live-control{margin:0 12px;align-items:flex-start;flex-direction:column}.score-toolbar{padding:10px}.score-desk-list{padding:0 8px 14px}.score-match{padding:10px 8px}.score-match-row{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:5px}.score-team b{font-size:.73rem}.score-team small{font-size:.58rem}.score-control{gap:3px}.score-control input{width:39px;height:43px;font-size:1.25rem}.score-control button{width:25px;height:34px;font-size:1rem}.score-match-actions{align-items:flex-start}.score-quick-pair{gap:8px}.score-quickset{max-width:100%}.score-bottom-actions{width:100%;justify-content:flex-end}.score-quickset button{padding:5px 6px}.score-footer{position:static;padding:10px;flex-wrap:wrap}.tv-topline{padding:8px 10px;font-size:.7rem;align-items:flex-start}.tv-topline span{display:block;margin:5px 0 0}.tv-top-actions{flex-wrap:wrap;justify-content:flex-end}.tv-top-actions button{font-size:.62rem;padding:6px}.tv-content{padding:10px}.tv-progress-grid{gap:6px;margin:20px auto}.tv-progress-grid>div{padding:10px}.tv-progress-grid span{font-size:.62rem}.tv-results-grid{grid-template-columns:1fr}.tv-result-card{padding:8px}.tv-footer{padding:7px 10px;font-size:.52rem}}
+        @media print{.rsth-quickbar,.desk-overlay,.tv-overlay{display:none!important}}
+
+        .login-desk-overlay{align-items:center;justify-content:center;background:linear-gradient(135deg,#101b30f2,#1c3557f2)}.login-desk-card{width:min(410px,calc(100% - 30px));box-sizing:border-box;background:#fff;border-radius:20px;padding:30px 28px;color:#1a2540;text-align:center;box-shadow:0 25px 80px #0008}.login-desk-brand{font-size:2.4rem;background:#e7f4eb;width:66px;height:66px;border-radius:50%;display:grid;place-items:center;margin:0 auto 12px}.login-desk-card h2{font-size:1.7rem;margin:7px 0}.login-desk-card>p{font-size:.8rem;line-height:1.55;color:#66758a;margin:0 0 18px}.login-google-btn,.login-submit-btn{width:100%;padding:12px;border-radius:9px;font-weight:900;cursor:pointer}.login-google-btn{border:1px solid #ccd6e4;background:#fff;color:#263a59}.login-submit-btn{border:0;background:#1a7a3a;color:#fff;margin-top:6px}.login-divider{display:flex;align-items:center;gap:10px;color:#8491a4;font-size:.68rem;margin:16px 0}.login-divider:before,.login-divider:after{content:'';height:1px;background:#dce3ed;flex:1}.login-desk-card label{display:block;text-align:left;font-size:.7rem;font-weight:800;color:#53627a;margin:10px 0}.login-desk-card input{display:block;box-sizing:border-box;width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;margin-top:5px;font:inherit;font-size:.85rem;color:#1a2540}.login-desk-msg{min-height:18px;margin-top:10px;color:#a22d2d;font-size:.7rem;overflow-wrap:anywhere}.login-visitor-btn{border:0;background:transparent;color:#1a4a7a;font-weight:800;margin-top:10px;cursor:pointer}
 </style>
 
 </head>
@@ -2501,7 +2600,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
     <div class="top-bar">
         <div class="logo">
             <h1>🏓 PICKLE<span>BALL</span> INTERCLUBS</h1>
-            <div class="badge">Format E · Victoire 3 pts · Nul 1 pt</div>
+            <div class="badge">32 à 48 équipes · Victoire 3 pts · Nul 1 pt</div>
         </div>
         <div class="stats">
             <div class="stat-card">P1 : <b><span id="p1Done">0</span>/<span id="p1Total">0</span></b></div>
@@ -2509,7 +2608,7 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
         </div>
         <div class="user-info" id="userInfo">
             <span id="userEmail"></span>
-            <button id="adminLoginBtn" onclick="toggleLoginPanel()" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:0.7rem;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:'Poppins',sans-serif;">🔑 Connexion</button>
+            <button id="adminLoginBtn" onclick="openLoginDesk()" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:0.7rem;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:'Poppins',sans-serif;">🔑 Connexion</button>
             <div id="loginPanel" style="display:none;position:fixed;top:60px;right:12px;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;width:270px;box-shadow:0 8px 32px rgba(0,0,0,0.25);">
                 <div style="font-weight:700;margin-bottom:12px;font-size:0.85rem;">🔑 Connexion</div>
                 <button onclick="loginWithGoogle()" style="width:100%;padding:9px;margin-bottom:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-size:0.78rem;font-family:'Poppins',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;"><img src="https://www.google.com/favicon.ico" style="width:14px;"> Google</button>
@@ -2521,6 +2620,16 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
             </div>
             <button class="btn-logout" id="logoutBtn" style="display:none;">🚪 Déconnexion</button>
         </div>
+    </div>
+
+    <div class="rsth-quickbar" id="rsthQuickbar">
+      <div class="rsth-quickbar-label">TOURNOI EN DIRECT</div>
+      <div class="rsth-quickbar-actions">
+        <button type="button" class="rq-btn rq-admin" onclick="openAdminDesk()">🛠️ Administration</button>
+        <button type="button" class="rq-btn rq-score" onclick="openScoreDesk('P1')">✍️ Saisie des résultats</button>
+        <button type="button" class="rq-btn rq-live" onclick="openLiveDesk()">📡 Live résultats</button>
+        <button type="button" class="rq-btn rq-screen" onclick="openTVDesk()">🖥️ Écran géant</button>
+      </div>
     </div>
 
     <div id="topRecap" class="top-recap">
@@ -2685,6 +2794,65 @@ window._smNav=function(idx){ _smSectionIdx=idx; renderScoreModal(); };
         <p>Tournoi Interclubs</p>
         <button id="loginBtn" class="login-btn">🔑 Se connecter avec Google</button>
     </div>
+</div>
+
+<div id="loginDesk" class="desk-overlay login-desk-overlay" aria-hidden="true">
+  <div class="login-desk-card">
+    <div class="login-desk-brand">🏓</div><div class="desk-kicker">TOURNOI INTERCLUBS</div><h2>Connexion</h2><p>Connecte-toi pour accéder aux fonctions d'administration ou de saisie des résultats. La consultation du live reste accessible sans connexion.</p>
+    <button class="login-google-btn" onclick="loginDeskGoogle()">🌐 Continuer avec Google</button><div class="login-divider"><span>ou avec ton compte</span></div>
+    <label>Email<input id="loginDeskEmail" type="email" autocomplete="username" placeholder="prenom@email.fr"></label><label>Mot de passe<input id="loginDeskPassword" type="password" autocomplete="current-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')loginDeskEmail()"></label>
+    <button class="login-submit-btn" onclick="loginDeskEmail()">Se connecter</button><div id="loginDeskMsg" class="login-desk-msg"></div>
+    <button class="login-visitor-btn" onclick="closeDesk('loginDesk')">Continuer en mode consultation →</button>
+  </div>
+</div>
+
+<div id="liveDesk" class="desk-overlay" aria-hidden="true">
+  <div class="desk-shell">
+    <header class="desk-head"><div><div class="desk-kicker">PICKLEBALL INTERCLUBS</div><h2>📡 Résultats en direct</h2><p id="liveDeskMeta">Suivi du tournoi actualisé automatiquement</p></div><button class="desk-close" onclick="closeDesk('liveDesk')">✕ Fermer</button></header>
+    <div class="desk-toolbar"><div class="desk-pills"><span id="liveP1Pill">Phase 1 : 0/0</span><span id="liveP2Pill">Phase 2 : 0/0</span><span id="liveFinPill">Classement : 0/0</span></div><button class="desk-action" onclick="openTVDesk()">🖥️ Afficher sur écran géant</button></div>
+    <div class="desk-filter"><label>Phase <select id="livePhaseFilter" onchange="renderLiveDesk()"><option value="ALL">Toutes</option><option value="P1">Phase 1</option><option value="P2">Phase 2</option><option value="FIN">Matchs de classement</option></select></label><label>État <select id="liveStateFilter" onchange="renderLiveDesk()"><option value="ALL">Tous les matchs</option><option value="PLAYED">Résultats saisis</option><option value="WAIT">À jouer / en attente</option></select></label><label class="desk-search">Rechercher une équipe <input id="liveSearch" type="search" placeholder="Nom du club…" oninput="renderLiveDesk()"></label></div>
+    <div id="liveDeskContent" class="live-grid"></div>
+  </div>
+</div>
+
+<div id="adminDesk" class="desk-overlay" aria-hidden="true">
+  <div class="desk-shell admin-shell">
+    <header class="desk-head"><div><div class="desk-kicker">ESPACE ORGANISATEUR</div><h2>🛠️ Administration du tournoi</h2><p>Les réglages et les outils sensibles restent réservés à l'administrateur.</p></div><button class="desk-close" onclick="closeDesk('adminDesk')">✕ Fermer</button></header>
+    <div id="adminDeskNoAccess" class="admin-noaccess" style="display:none">🔒 Connecte-toi avec un compte administrateur pour utiliser ces commandes.<br><button class="desk-action" onclick="toggleLoginPanel()">🔑 Ouvrir la connexion</button></div>
+    <div id="adminDeskContent">
+      <div class="admin-actions-grid">
+        <button onclick="closeDesk('adminDesk');switchTab('config')"><b>⚙️ Configuration</b><span>Équipes, terrains, horaires et format</span></button>
+        <button onclick="closeDesk('adminDesk');switchTab('teams')"><b>👥 Équipes et poules</b><span>Modifier les clubs et les joueurs</span></button>
+        <button onclick="closeDesk('adminDesk');switchTab('users')"><b>🔐 Comptes et accès</b><span>Gestion des utilisateurs autorisés</span></button>
+        <button onclick="closeDesk('adminDesk');openScoreDesk('P1')"><b>✍️ Saisie des scores</b><span>Ouvrir la saisie rapide des résultats</span></button>
+      </div>
+      <div class="admin-live-control"><div><b>📡 Publication des résultats</b><p>Commande d'ouverture/fermeture du live public (état informatif synchronisé).</p></div><button id="livePublishToggle" class="desk-action" onclick="toggleLivePublish()">🟢 Live ouvert</button></div>
+      <div class="admin-actions-grid">
+        <button onclick="adminGenerateFlexible('P1')"><b>🏐 Générer la Phase 1</b><span>Préparer les matchs des poules</span></button>
+        <button onclick="adminGenerateFlexible('P2')"><b>🏆 Générer la Phase 2</b><span>À partir des classements de P1</span></button>
+        <button onclick="adminGenerateFlexible('FIN')"><b>🥇 Matchs de classement</b><span>Calculer les rencontres finales</span></button>
+        <button onclick="adminGenerateFlexible('HORAIRES')"><b>🕘 Recalculer le planning</b><span>Répartir les matchs par terrain et horaire</span></button>
+      </div>
+      <div class="admin-warning">⚠️ Avant une génération qui remplace des matchs, vérifie les scores déjà saisis. Les règles et formules du moteur flexible ne sont pas modifiées par cette interface.</div>
+    </div>
+  </div>
+</div>
+
+<div id="scoreDesk" class="desk-overlay" aria-hidden="true">
+  <div class="desk-shell score-shell">
+    <header class="desk-head"><div><div class="desk-kicker">SAISIE RAPIDE</div><h2>✍️ Résultats des matchs</h2><p id="scoreDeskSubtitle">Saisie guidée, contrôle visuel et sauvegarde automatique.</p></div><button class="desk-close" onclick="closeDesk('scoreDesk')">✕ Fermer</button></header>
+    <div class="score-toolbar"><div class="score-phase-tabs"><button data-score-phase="P1" onclick="setScoreDeskPhase('P1')">🏐 Phase 1</button><button data-score-phase="P2" onclick="setScoreDeskPhase('P2')">🏆 Phase 2</button><button data-score-phase="FIN" onclick="setScoreDeskPhase('FIN')">🥇 Classement</button></div><div class="score-mode-tabs"><button data-score-mode="terrain" onclick="setScoreDeskMode('terrain')">Par terrain</button><button data-score-mode="groupe" onclick="setScoreDeskMode('groupe')">Par poule/catégorie</button><button data-score-mode="all" onclick="setScoreDeskMode('all')">Tous les matchs</button></div></div>
+    <div class="desk-filter score-filters"><label>Filtrer <select id="scoreStateFilter" onchange="renderScoreDesk()"><option value="WAIT">À saisir en priorité</option><option value="ALL">Tous les matchs</option><option value="PLAYED">Résultats déjà saisis</option></select></label><label class="desk-search">Rechercher club / poule / terrain <input id="scoreSearch" type="search" placeholder="Ex. Mauves, T2, Poule A…" oninput="renderScoreDesk()"></label><button class="desk-action" onclick="jumpToNextUnplayed()">⏭️ Prochain match sans score</button></div>
+    <div id="scoreDeskProgress" class="score-progress"></div>
+    <div id="scoreDeskContent" class="score-desk-list"></div>
+    <footer class="score-footer"><span id="scoreDeskStatus">Les scores sont enregistrés automatiquement.</span><button class="desk-action" onclick="closeDesk('scoreDesk')">✅ Terminer la saisie</button></footer>
+  </div>
+</div>
+
+<div id="tvDesk" class="tv-overlay" aria-hidden="true">
+  <div class="tv-topline"><div>🏓 PICKLEBALL INTERCLUBS <span id="tvDeskSubtitle">RÉSULTATS EN DIRECT</span></div><div class="tv-top-actions"><button onclick="toggleTVRotation()" id="tvRotationBtn">⏸ Pause défilement</button><button onclick="toggleTVFullscreen()">⛶ Plein écran</button><button onclick="closeDesk('tvDesk')">✕ Quitter</button></div></div>
+  <div id="tvDeskContent" class="tv-content"></div>
+  <div class="tv-footer"><span id="tvDeskProgress">Résultats mis à jour automatiquement</span><span>TOURNOI INTERCLUBS · LIVE</span></div>
 </div>
 
 <div class="floating-nav">
